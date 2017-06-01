@@ -1,10 +1,10 @@
 #!/usr/bin/python2
 #
 # Copyright (c) 2015, Intel Corporation
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 #     * Redistributions of source code must retain the above copyright notice,
 #       this list of conditions and the following disclaimer.
 #     * Redistributions in binary form must reproduce the above copyright
@@ -13,7 +13,7 @@
 #     * Neither the name of Intel Corporation nor the names of its contributors
 #       may be used to endorse or promote products derived from this software
 #       without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -39,6 +39,13 @@ class Memory(pat_base):
     def __init__(self, file_path):
         """Read and parse the data and store it in self.data_array"""
         self.data_array = self.get_data(file_path)
+        self.avg_array = []
+        self.title_line = []
+        self.kbmemused_index = []
+        self.kbmemfree_index = []
+        self.kbbuffers_index = []
+        self.kbcached_index = []
+        self.ts_index = []
         self.time_stamp_array = []
         self.avg_array = self.extract_data()
 
@@ -47,42 +54,26 @@ class Memory(pat_base):
         in an array avg_array[]"""
         self.avg_array = []
         self.title_line = self.data_array[0]
-        self.kbmemused_index = self.data_array[0].index("kbmemused")
-        self.kbmemfree_index = self.data_array[0].index("kbmemfree")
-        self.kbbuffers_index = self.data_array[0].index("kbbuffers")
-        self.kbcached_index = self.data_array[0].index("kbcached")
-        self.ts_index = self.data_array[0].index("TimeStamp")
+        self.kbmemused_index = self.title_line.index("kbmemused")
+        self.kbmemfree_index = self.title_line.index("kbmemfree")
+        self.kbbuffers_index = self.title_line.index("kbbuffers")
+        self.kbcached_index = self.title_line.index("kbcached")
+        self.ts_index = self.title_line.index("TimeStamp")
         del self.data_array[0]
 
-        # time stamps
-        self.time_stamp_array = []
         for self.row in self.data_array:
+            # time stamps
             self.time_stamp_array.append((int(self.row[self.ts_index])))
-
-        # extract kbmemused metric
-        self.kbmemused = []
-        for self.row in self.data_array:
+            # extract kbmemused metric
             self.kbmemused.append(int(self.row[self.kbmemused_index]))
-
-        # extract kbmemfree metric
-        self.kbmemfree = []
-        for self.index, self.row in enumerate(self.data_array):
+            # extract kbmemfree metric
             self.kbmemfree.append(int(self.row[self.kbmemfree_index]))
-
-        # extract kbbuffers metric
-        self.kbbuffers = []
-        for self.row in self.data_array:
+            # extract kbbuffers metric
             self.kbbuffers.append(int(self.row[self.kbbuffers_index]))
-
-        # extract kbcached metric
-        self.kbcached = []
-        for self.index, self.row in enumerate(self.data_array):
+            # extract kbcached metric
             self.kbcached.append(int(self.row[self.kbcached_index]))
-
-        # calculate the application memory utilization metric
-        # The application level memory used is the total memory used minus buffers and cached memory
-        self.kbappmemused = []
-        for self.row in self.data_array:
+            # calculate the application memory utilization metric
+            # The application level memory used is the total memory used minus buffers and cached memory
             self.kbappmemused.append(int(self.row[self.kbmemused_index]) - int(self.row[self.kbbuffers_index]) - int(
                 self.row[self.kbcached_index]))
 
@@ -253,12 +244,18 @@ def plot_graph(data, pp, graph_title):
     # x1, x2, y1, y2 = ax.axis()
     # set axes
 
-    ax.axis((min(time_stamp_array), max(time_stamp_array), 0, memory_free[0]*1.1))
+    ax.axis((min(time_stamp_array), max(time_stamp_array), 0, memory_free[0] * 1.1))
 
     # set xlabel, ylabel and title
-    ax.set_ylabel('Memory(kB)')
     ax.set_xlabel('time(s)')
+    ax.set_ylabel('Memory(kB)')
     ax.set_title(graph_title + ' Memory Utilization')
+
+    ax.ticklabel_format(style='plain')
+    labels = []
+    for i in ax.get_yticks():
+        labels.append(int(i))
+    ax.set_yticklabels(labels, size='x-small')
     ax.grid(True)
     fig.text(0.95, 0.05, pp.get_pagecount() + 1, fontsize=10)
     pp.savefig(dpi=200)
@@ -287,7 +284,7 @@ def get_data_for_graph(data_array):
         kbbuffers = []
         for entry in data_array[3]:
             kbbuffers.append(int(entry))
-            new_kbbuffers = get_graph_mean(x, kbbuffers)
+        new_kbbuffers = get_graph_mean(x, kbbuffers)
 
         kbcached = []
         for entry in data_array[4]:
@@ -327,12 +324,12 @@ def write_excel(cluster, wb):
     row_data = 0
     col_data = 0
     span = 1
-    fill_value = -1
     tmp_new = []
     count = 0
 
     for node in cluster:
         if hasattr(node, 'memory_obj'):
+            fill_value = -1
             node_data = node.memory_obj.data_array
 
             tmp = [elem[1] for elem in node_data]

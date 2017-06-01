@@ -1,10 +1,10 @@
 #!/usr/bin/python2
 #
 # Copyright (c) 2015, Intel Corporation
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 #     * Redistributions of source code must retain the above copyright notice,
 #       this list of conditions and the following disclaimer.
 #     * Redistributions in binary form must reproduce the above copyright
@@ -13,7 +13,7 @@
 #     * Neither the name of Intel Corporation nor the names of its contributors
 #       may be used to endorse or promote products derived from this software
 #       without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -35,62 +35,66 @@ import perf_module
 import xml.etree.ElementTree as ET
 import sys
 import time
+import pandas as pd
 
+pd.options.display.float_format = '{:.2f}'.format
 
-#==================== Python version =========================
+# ==================== Python version =========================
 cur_python_version = sys.version_info
-#platform.python_version()
-#cur_version[:2] will give you first two elements of the list
-if cur_python_version[:2] >= (2,7):
+# platform.python_version()
+# cur_version[:2] will give you first two elements of the list
+if cur_python_version[:2] >= (2, 7):
     found = True
     print "---- You currently have Python " + sys.version
 else:
     found = False
     print "---- Error, You need python 2.7.x+ and currently you have " + sys.version
 
-#====================== matplotlib ===========================
+# ====================== matplotlib ===========================
 try:
-    import matplotlib #must have here. If not then matplotlib.__version__ not recognize
+    import matplotlib  # must have here. If not then matplotlib.__version__ not recognize
     from matplotlib.backends.backend_pdf import PdfPages
+
     cur_matplotlib_version = matplotlib.__version__.replace(".", "")
     req_matplotlib_version = '1.3.1'.replace(".", "")
     if cur_matplotlib_version.isdigit() >= req_matplotlib_version.isdigit():
         found = True
         print "---- You currently have matplotlib " + matplotlib.__version__
-    else:   
+    else:
         found = False
         print "---- Error, You need matplotlib 1.3.1+ and currently you have " + matplotlib.__version__
 
-except ImportError: #handle exception
+except ImportError:  # handle exception
     found = False
     print '---- missing dependency - python-matplotlib' + \
-        '\n---- Please install python module - matplotlib'
+          '\n---- Please install python module - matplotlib'
 
-#===================== xlsxwriter ===========================        
+# ===================== xlsxwriter ===========================
 try:
     import xlsxwriter
+
     cur_xlsxwriter_version = xlsxwriter.__version__.replace(".", "")
     req_xlsxwriter_version = '0.6.3'.replace(".", "")
     if cur_xlsxwriter_version.isdigit() >= req_xlsxwriter_version.isdigit():
         found = True
         print "---- You currently have xlsxwriter " + xlsxwriter.__version__
-    else:   
+    else:
         found = False
         print "---- Error, You need xlsxwriter 0.6.3+ and currently you have " + xlsxwriter.__version__
 
-except ImportError: #handle exception
+except ImportError:  # handle exception
     found = False
     print '---- missing dependency - python-xlsxwriter' + \
-        '\n---- Please install python module - xlsxwriter'
+          '\n---- Please install python module - xlsxwriter'
 
-#==================== starting stript =====================
+# ==================== starting stript =====================
 if found is False:
     print '---- Must use Python 2.7 or grater' + \
-    '\n---- dependencies missing - exiting script >>>>>>>>>>>'
+          '\n---- dependencies missing - exiting script >>>>>>>>>>>'
     sys.exit()
 else:
     print '---- You have all required dependencies' + \
-    '\n---- PAT-post-processing script will start automatically'
+          '\n---- PAT-post-processing script will start automatically'
 
 
 def get_dirpaths(directory):
@@ -115,6 +119,7 @@ class Node(object):
         self.node_folder_path = node_folder_path
         self.node_file_paths = self.get_file_paths(self.node_folder_path)
         self.corrupt = Node.corrupt
+        self.host = node_folder_path.split("/")[len(node_folder_path.split("/")) - 1]
 
         # file at location [0] is cpustat file
         if os.path.isfile(self.node_file_paths[0]) and os.stat(
@@ -221,6 +226,7 @@ def adjust_timestamps(cluster):
             for index, row in enumerate(node.memory_obj.time_stamp_array):
                 node.memory_obj.time_stamp_array[index] = row - base_timestamp
 
+
 def make_cluster(result_path):
     """
     Creates a new Node object for each node
@@ -273,11 +279,17 @@ def generate_output(cluster):
         result_path = root[3].text
         name_node = root[4].text
 
+        s = root[3].text
+        if s[-1] == "/":
+            pat_name = s.split("/")[-3]
+        else:
+            pat_name = s.split("/")[-2]
+
     if en_pdf == 'yes':
         print "----Rendering pdf", time.ctime(), "----"
 
         # global pdf file that will contain all charts
-        pp = PdfPages(result_path + '/PAT-Result.pdf')
+        pp = PdfPages(result_path + '/' + pat_name + '.pdf')
 
         # print average cpu utilization graph to pdf
         if en_avg_cpu == 'yes' or en_avg_cpu == 'Yes':
@@ -346,11 +358,11 @@ def generate_output(cluster):
                                                node.perf_obj.avg_array,
                                                metric_list, "node", None, None)
                     perf_module.plot_pie_chart(node.perf_obj.module_array,
-                                               pp, str(node_name)+" Module",
+                                               pp, str(node_name) + " Module",
                                                node.perf_obj.avg_array,
                                                metric_list, "node", None, None)
                     perf_module.plot_pie_chart(node.perf_obj.function_array,
-                                               pp, str(node_name)+" Function",
+                                               pp, str(node_name) + " Function",
                                                node.perf_obj.avg_array,
                                                metric_list, "node", None, None)
             if en_all_memory == 'yes' or en_all_memory == 'Yes':
@@ -362,8 +374,7 @@ def generate_output(cluster):
 
     if en_xl == 'yes':
         print "----Generating Excel", time.ctime(), "----"
-        wb = xlsxwriter.Workbook(result_path + '/PAT-Result.xlsm')
-        print "----Generating CSV", time.ctime(), "----"
+        wb = xlsxwriter.Workbook(result_path + '/' + pat_name + '.xlsm')
         csv_path_cpu = result_path + "/CPU.csv"
         csv_path_disk = result_path + "/DISK.csv"
         csv_path_net = result_path + "/NET.csv"
@@ -381,6 +392,12 @@ def generate_output(cluster):
             perf_module.write_excel(cluster, wb)
         if en_memory_xl == 'yes' or en_memory_xl == 'Yes':
             memory_module.write_excel(cluster, wb)
+        wb.add_vba_project('./vbaProject.bin')
+        print "----Finished Excel", time.ctime(), "----"
+        wb.close()
+
+    if en_csv == 'yes':
+        print "----Generating CSV", time.ctime(), "----"
         # generate CSV file
         if en_cpu_csv == 'yes' or en_cpu_csv == 'Yes':
             cpu_module.csv_writer(cluster, csv_path_cpu)
@@ -392,10 +409,138 @@ def generate_output(cluster):
             perf_module.csv_writer(cluster, csv_path_perf)
         if en_memory_csv == 'yes' or en_memory_csv == 'Yes':
             memory_module.csv_writer(cluster, csv_path_memory)
-        wb.add_vba_project('./vbaProject.bin')
-        print "----Finished Excel", time.ctime(), "----"
         print "----Finished CSV", time.ctime(), "----"
-        wb.close()
+
+
+def calculate_abnormal(cluster, result_path):
+    # generate pandas data frame for node info. Calculate the average system resource utilization of each node
+    list_1abel = ["host", "cpu_user", "cpu_system", "cpu_iowait", "disk_read", "disk_write", "network_rx", "network_tx",
+                  "memory_used"]
+    list_value = []
+    host = []
+    cpu_user = []
+    cpu_system = []
+    cpu_iowait = []
+    disk_read = []
+    disk_write = []
+    network_rx = []
+    network_tx = []
+    memory_used = []
+    for node in cluster:
+        if hasattr(node, 'host'):
+            host.append(node.host)
+            cpu_user.append(pd.Series(node.cpu_obj.user_percent).mean())
+            cpu_system.append(pd.Series(node.cpu_obj.system_percent).mean())
+            cpu_iowait.append(pd.Series(node.cpu_obj.iowait_percent).mean())
+            disk_read.append(pd.Series(node.disk_obj.rkbps_sum).mean())
+            disk_write.append(pd.Series(node.disk_obj.wkbps_sum).mean())
+            network_rx.append(pd.Series(node.net_obj.rxkbps_sum).mean())
+            network_tx.append(pd.Series(node.net_obj.txkbps_sum).mean())
+            memory_used.append(pd.Series(node.memory_obj.kbappmemused).mean())
+    list_value.append(host)
+    list_value.append(cpu_user)
+    list_value.append(cpu_system)
+    list_value.append(cpu_iowait)
+    list_value.append(disk_read)
+    list_value.append(disk_write)
+    list_value.append(network_rx)
+    list_value.append(network_tx)
+    list_value.append(memory_used)
+    dc = dict(zip(list_1abel, list_value))
+    df = pd.DataFrame(dc,
+                      columns=["host", "cpu_user", "cpu_system", "cpu_iowait", "disk_read", "disk_write", "network_rx",
+                               "network_tx", "memory_used"])
+    df.to_csv(result_path + "/node_report.csv")
+    f = open(result_path + "/node_report", "w+")
+    print >> f, df.to_string()
+    print >> f, df.mean().to_string()
+    # print df
+
+    # find the abnormal node according to CPU utilization
+    print "===================Nodes List for Abnormal CPU===================================="
+    c1 = find_abnormal(df["cpu_user"])
+    c2 = find_abnormal(df["cpu_system"])
+    c3 = find_abnormal(df["cpu_iowait"])
+    c = c1 & c2 & c3
+    cl = list(c)
+    #  print "The following is the abnormal node according to network speed"
+    user_mean = df["cpu_user"].mean()
+    system_mean = df["cpu_system"].mean()
+    iowait_mean = df["cpu_iowait"].mean()
+
+    df_cpu = df.iloc[cl, [0, 1, 2, 3]]
+    df_cpu["user_offset"] = (df_cpu["cpu_user"] / user_mean - 1) * 100
+    df_cpu["system_offset"] = (df_cpu["cpu_system"] / system_mean - 1) * 100
+    df_cpu["iowait_offset"] = (df_cpu["cpu_iowait"] / iowait_mean - 1) * 100
+    if df_cpu.empty:
+        print 'None'
+    else:
+        print df_cpu.to_string()
+
+    # find the abnormal node according to DISK
+    print ''
+    print "===================Nodes List for Abnormal DISK===================================="
+    d1 = find_abnormal(df["disk_read"])
+    d2 = find_abnormal(df["disk_write"])
+    d = d1 | d2
+    dl = list(d)
+    # print "The following is the abnormal node according to disk speed"
+    dr_mean = df["disk_read"].mean()
+    dw_mean = df["disk_write"].mean()
+
+    df_disk = df.iloc[dl, [0, 4, 5]]
+    df_disk["dr_offset"] = (df_disk["disk_read"] / dr_mean - 1) * 100
+    df_disk["dw_offset"] = (df_disk["disk_write"] / dw_mean - 1) * 100
+    if df_disk.empty:
+        print 'None'
+    else:
+        print df_disk.to_string()
+
+    # find the abnormal node according to Network
+    print ''
+    print "===================Nodes List for Abnormal NETWORK================================"
+    n1 = find_abnormal(df["network_rx"])
+    n2 = find_abnormal(df["network_tx"])
+    n = n1 | n2
+    nl = list(n)
+    # print "The following is the abnormal node according to network speed"
+    rx_mean = df["network_rx"].mean()
+    tx_mean = df["network_tx"].mean()
+
+    df_network = df.iloc[nl, [0, 6, 7]]
+    df_network.append(df_network.mean(), ignore_index=True)
+    df_network["rx_offset"] = (df_network["network_rx"] / rx_mean - 1) * 100
+    df_network["tx_offset"] = (df_network["network_tx"] / tx_mean - 1) * 100
+    if df_network.empty:
+        print 'None'
+    else:
+        print df_network.to_string()
+
+    # find the abnormal node according to Memory
+    print ""
+    print "===================Nodes List for Abnormal MEMORY================================="
+    m = find_abnormal(df["memory_used"])
+    ml = list(m)
+    # print "The following is the abnormal node according to memory used"
+    m_mean = df["memory_used"].mean()
+
+    df_memory = df.iloc[ml, [0, 8]]
+    df_memory.append(df_memory.mean(), ignore_index=True)
+    df_memory["memory_offset"] = (df_memory["memory_used"] / m_mean - 1) * 100
+    if df_memory.empty:
+        print 'None'
+    else:
+        print df_memory.to_string()
+
+
+def find_abnormal(metric, threshold=0.20):
+    mean = metric.mean()
+    ind = metric.index
+    s = set()
+    for i in ind:
+        if abs(metric[i] / mean - 1) > threshold:
+            s.add(i)
+    return s
 
 
 def main():
@@ -409,6 +554,7 @@ def main():
     print "Started processing on", time.ctime()
     cluster = make_cluster(root[3].text)
     print "Completed processing on", time.ctime()
+    calculate_abnormal(cluster, root[3].text)
     generate_output(cluster)
 
 

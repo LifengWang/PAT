@@ -265,12 +265,12 @@ def write_excel(cluster, wb):
     row_data = 0
     col_data = 0
     span = 1
-    fill_value = -1
     tmp_new = []
     count = 0
 
     for node in cluster:
         if hasattr(node, 'net_obj'):
+            fill_value = -1
             node_data = node.net_obj.data_array
             
             tmp = [elem[1] for elem in node_data]
